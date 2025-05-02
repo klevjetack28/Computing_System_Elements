@@ -24,32 +24,13 @@
 	@colIndex
 	M=0
 
-// Color
-	@0
-	D=M
-	@color
-	M=D
-
 // Start loop
 (LOOP)
-
-	// Set color to white
-	@-1
-	D=M
-	@color
-	M=D
-
 	// Check key is pressed
 	@KBD
 	D=M
-	@ROWS
+	@CONTINUE
 	D;JEQ
-
-	// Set color to white
-	@0
-	D=M
-	@color
-	M=D
 
 	@rowPos
 	M=0
