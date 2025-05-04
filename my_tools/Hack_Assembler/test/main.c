@@ -2,9 +2,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 // Assembler Headers
 #include "hashmap/hashmap.h"
+
+int16_t aInstruction(char* num)
+{
+    int16_t machine_code = 0;
+
+    machine_code |= 0b0 << 15; // By convention first bit is 1 and next two are not used.
+
+    machine_code |= atoi(num);
+    printf("machine: %d\n", machine_code);
+
+    return machine_code;
+ }
+
+int16_t cInstruction(hashmap_t* instructions, char* comp, char* dest, char* jump)
+{
+    return 0;
+}
+
 /*
 void initialization(hashmap_t* map)
 {
@@ -22,22 +41,75 @@ void initialization(hashmap_t* map)
     return;
 }
 */
-void basic_assembler(hashmap_t* map, char* file_path, int len_path)
+
+void initializeInstr(hashmap_t* instructions)
 {
+    insert(instructions, "c0", 0b0101010);
+    insert(instructions, "c1", 0b0111111);
+    insert(instructions, "c-1", 0b0111010);
+    insert(instructions, "cD", 0b0001100);
+    insert(instructions, "cA", 0b0110000);
+    insert(instructions, "c!D", 0b0001101);
+    insert(instructions, "c!A", 0b0001111);
+    insert(instructions, "c-D", 0b0110011);
+    insert(instructions, "c-A", 0b0011111);
+    insert(instructions, "cD+1", 0b0110111);
+    insert(instructions, "cA+1", 0b0001110);
+    insert(instructions, "cD-1", 0b0110010);
+    insert(instructions, "cA-1", 0b0000010);
+    insert(instructions, "cD+A", 0b0000010);
+    insert(instructions, "cD-A", 0b0010011);
+    insert(instructions, "cA-D", 0b0000111);
+    insert(instructions, "cD&A", 0b0000000);
+    insert(instructions, "cD|A", 0b0010101);
+    insert(instructions, "cM", 0b1110000);
+    insert(instructions, "c!M", 0b1110001);
+    insert(instructions, "c-M", 0b1110011);
+    insert(instructions, "cM+1", 0b1110111);
+    insert(instructions, "cM-1", 0b1110010);
+    insert(instructions, "cD+M", 0b1000010);
+    insert(instructions, "cD-M", 0b1010011);
+    insert(instructions, "cM-D", 0b1000111);
+    insert(instructions, "cD&M", 0b1000000);
+    insert(instructions, "cD|M", 0b1010101);
+    insert(instructions, "dnull", 0b000);
+    insert(instructions, "dM", 0b001);
+    insert(instructions, "dD", 0b010);
+    insert(instructions, "dDM", 0b011);
+    insert(instructions, "dA", 0b100);
+    insert(instructions, "dAM", 0b101);
+    insert(instructions, "dAD", 0b110);
+    insert(instructions, "dADM", 0b111);
+    insert(instructions, "jnull", 0b000);
+    insert(instructions, "jJGT", 0b001);
+    insert(instructions, "jJEQ", 0b010);
+    insert(instructions, "jJGE", 0b011);
+    insert(instructions, "jJLT", 0b100);
+    insert(instructions, "jJNE", 0b101);
+    insert(instructions, "jJLE", 0b110);
+    insert(instructions, "jJMP", 0b111);
+}
+
+void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, int len_path)
+{
+    printf("Starting assembler...\n");
+
     FILE* file = fopen(file_path, "r");
     if (file == NULL) 
     {
-        printf("ERROR: Could not open file {%s}.", file_path);
+        printf("ERROR: Could not open file {%s}.\n", file_path);
         return;
     }
 
     // Get the name of the file - "asm" text
-    char* machine_path;
-    strcpy(machine_path, file_path, len_path - 3);
+    char machine_path[len_path];
+    strcpy(machine_path, file_path);
+    machine_path[len_path - 3] = '\0';
     
     // Concat the machine code path with the "hack" file extension
     char* hackf_ext = "hack";
     strcat(machine_path, hackf_ext);
+    printf("Machine path: %s\n", machine_path);
 
     FILE* machine_file = fopen(machine_path, "w");
     if (machine_file == NULL)
@@ -46,7 +118,7 @@ void basic_assembler(hashmap_t* map, char* file_path, int len_path)
         return;
     }
 
-    int lineAsm = 0, lineHack = 0;
+    int lineCount = 0;
     
     char* line;
     size_t len = 0;
@@ -58,16 +130,7 @@ void basic_assembler(hashmap_t* map, char* file_path, int len_path)
 
         switch (startLine)
         {
-            case '/':
-                // Confirm if start of line is comment
-                if (line[1] != '/')
-                {
-                    // If not start of comment
-                    printf("ERROR: Syntax not recognized. Like %d", lineAsm);
-                    return;
-                }
-                break;
-            case '@':
+            case '@': { 
                 /* Old parenthesis code will reuse
                 size_t size = 0;
                 while ((startLine = *line++) != ')')
@@ -78,17 +141,72 @@ void basic_assembler(hashmap_t* map, char* file_path, int len_path)
                 strcpy(symbol, size + 1, line);
                 insert(map, symbol, lineHack + 1);
                 */
-                break;
-            case '\n':
-                break;
-            default:
-                fprintf("%s", line);
-                lineCount++;
-        }
+                char num[len - 1];
+                int i = 0;
+                while ((startLine = *++line) != '\0')
+                {
+                    num[i++] = startLine;
+                }
+                num[len - 1] = '\0';
+                
+                aInstruction(num);
 
+                lineCount++;        
+                break;
+            }
+            case 'A':
+            case 'D':
+            case 'M': {
+                bool jmpInstr = false;
+                char comp[5], dest[5], jump[5]; // Parsed Symbols
+
+                char token[5]; // Temp symbol
+                int i = 0;
+                while((startLine = *line++) != '\0')
+                {
+                    // Append next char to token
+                    token[i++] = startLine;
+
+                    // A dest instruction
+                    if (startLine == '=')
+                    {
+                        jmpInstr = false;
+                        strcpy(dest, token);
+                        dest[4] = '\0';
+                        i = 0;
+                    }
+
+                    // A jump instruction
+                    else if (startLine == ';')
+                    {
+                        jmpInstr = true;
+                        strcpy(comp, token);
+                        comp[4] = '\0';
+                        i = 0;
+                    }
+                }
+                // If jump instruction rvalue = jump
+                if (jmpInstr)
+                {
+                    strcpy(jump, token);
+                    jump[4] = '\0';
+                }
+                // Else rvalue = comp
+                else 
+                {
+                    strcpy(comp, token);
+                    comp[4] = '\0';
+                }
+
+                cInstruction(map, comp, dest, jump);
+
+                lineCount++;
+                break;
+            }
+        }
     }
         fclose(file);
-        fclose(tmp_file);
+        fclose(machine_file);
 }
 
 
@@ -98,10 +216,13 @@ int main(int argc, char *argv[])
     char* file_path = (char*)malloc(len_path * sizeof(char));
     strcpy(file_path, argv[1]);
 
-    hashmap_t map;
+    hashmap_t* map;
     //initializtion(map);
 
-    basic_assembler(map, file_path, int len_path);
+    hashmap_t* instr;
+    initializeInstr(instr);
+
+    basic_assembler(instr, map, file_path, len_path);
     // second_pass();
 
     return 0;
