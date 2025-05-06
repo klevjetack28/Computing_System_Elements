@@ -9,19 +9,29 @@
 
 int16_t aInstruction(char* num)
 {
-    int16_t machine_code = 0;
-
-    machine_code |= 0b0 << 15; // By convention first bit is 1 and next two are not used.
-
-    machine_code |= atoi(num);
-    printf("machine: %d\n", machine_code);
-
-    return machine_code;
+    return atoi(num);
  }
 
 int16_t cInstruction(hashmap_t* instructions, char* comp, char* dest, char* jump)
 {
-    return 0;
+    int16_t instruction = 0;
+
+    instruction |= 0b111 << 3; // The first bit is a 1 and the next 2 bits are not used.
+
+    char* instrC = "c";
+    strcat(instrC, comp);
+    instruction |= search(instructions, instrC) << 7; // 7 bits 1 bit is a next 6 specify the instruction.
+
+    char* instrD = "d";
+    strcat(instrD, dest);
+    instruction |= search(instructions, instrD) << 3; // 3 bits to specify the destination
+
+    char* instrJ = "j";
+    strcat(instrJ, jump);
+    instruction |= search(instructions, instrJ) << 3; // 3 bits to specify the jump instruction
+
+    printf("%d", instruction);
+    return instruction;
 }
 
 /*
