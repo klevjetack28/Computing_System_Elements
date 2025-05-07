@@ -5,32 +5,62 @@
 #include <stdbool.h>
 
 // Assembler Headers
-#include "hashmap/hashmap.h"
+#include "../include/hashmap.h"
+
+char* int_to_binary(int16_t num)
+{
+    int bits = 16;
+    char* binary = malloc(bits + 1);
+
+    int n = num;
+    for (int i = 0; i < bits; i++)
+    {
+        n %= 2;
+        binary[bits - i - 1] = '0' + n;
+        n /= 2;
+    }
+    binary[bits] = '\0';
+    return binary;
+}
+
+void writeInstruction(FILE* machine_file, int16_t instruction)
+{
+    char* binary = int_to_binary(instruction);
+    fprintf(machine_file, "%s\n", binary);
+    free(binary);
+}
 
 int16_t aInstruction(char* num)
 {
     return atoi(num);
  }
 
+char* instructionCoder(char* instruction, char prefix)
+{
+    size_t len = strlen(instruction);
+    char* out = malloc(len + 2);
+    out[0] = prefix;
+    memcpy(out + 1, instruction, len + 1);
+    return out;
+}
+
 int16_t cInstruction(hashmap_t* instructions, char* comp, char* dest, char* jump)
 {
     int16_t instruction = 0;
-
     instruction |= 0b111 << 3; // The first bit is a 1 and the next 2 bits are not used.
 
-    char* instrC = "c";
-    strcat(instrC, comp);
-    instruction |= search(instructions, instrC) << 7; // 7 bits 1 bit is a next 6 specify the instruction.
+    char* compI = instructionCoder(comp, 'c');
+    instruction |= search(instructions, compI) << 7; // 7 bits 1 bit is a next 6 specify the instruction.
 
-    char* instrD = "d";
-    strcat(instrD, dest);
-    instruction |= search(instructions, instrD) << 3; // 3 bits to specify the destination
+    char* destI = instructionCoder(dest, 'd');
+    instruction |= search(instructions, destI) << 3; // 3 bits to specify the destination
 
-    char* instrJ = "j";
-    strcat(instrJ, jump);
-    instruction |= search(instructions, instrJ) << 3; // 3 bits to specify the jump instruction
+    char* jumpI = instructionCoder(jump, 'j');
+    instruction |= search(instructions, jumpI) << 3; // 3 bits to specify the jump instruction
 
-    printf("%d", instruction);
+    free(compI);
+    free(destI);
+    free(jumpI);
     return instruction;
 }
 
@@ -52,8 +82,9 @@ void initialization(hashmap_t* map)
 }
 */
 
-void initializeInstr(hashmap_t* instructions)
+void initializeInstr(hashmap_t** instructions)
 {
+    initializeHashMap(*instructions, 0, 8);
     insert(instructions, "c0", 0b0101010);
     insert(instructions, "c1", 0b0111111);
     insert(instructions, "c-1", 0b0111010);
@@ -100,10 +131,8 @@ void initializeInstr(hashmap_t* instructions)
     insert(instructions, "jJMP", 0b111);
 }
 
-void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, int len_path)
+void basic_assembler(hashmap_t* instructions, char* file_path)
 {
-    printf("Starting assembler...\n");
-
     FILE* file = fopen(file_path, "r");
     if (file == NULL) 
     {
@@ -112,12 +141,13 @@ void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, i
     }
 
     // Get the name of the file - "asm" text
-    char machine_path[len_path];
+    char* machine_path = malloc(strlen(file_path) + 2); // + 1 for '\0' + 1 for 4th letter in hack
     strcpy(machine_path, file_path);
-    machine_path[len_path - 3] = '\0';
+    machine_path[strlen(file_path) - 3] = '\0';
     
     // Concat the machine code path with the "hack" file extension
-    char* hackf_ext = "hack";
+    char* hackf_ext = malloc(5);
+    hackf_ext = "hack";
     strcat(machine_path, hackf_ext);
     printf("Machine path: %s\n", machine_path);
 
@@ -142,8 +172,6 @@ void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, i
         {
             case '@': { 
                 /* Old parenthesis code will reuse
-                size_t size = 0;
-                while ((startLine = *line++) != ')')
                 {
                     size++;
                 }
@@ -151,7 +179,7 @@ void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, i
                 strcpy(symbol, size + 1, line);
                 insert(map, symbol, lineHack + 1);
                 */
-                char num[len - 1];
+                char num[len];
                 int i = 0;
                 while ((startLine = *++line) != '\0')
                 {
@@ -159,7 +187,8 @@ void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, i
                 }
                 num[len - 1] = '\0';
                 
-                aInstruction(num);
+                int16_t instruction = aInstruction(num);
+                writeInstruction(machine_file, instruction);
 
                 lineCount++;        
                 break;
@@ -208,8 +237,8 @@ void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, i
                     comp[4] = '\0';
                 }
 
-                cInstruction(map, comp, dest, jump);
-
+                int16_t instruction = cInstruction(instructions, comp, dest, jump);
+                writeInstruction(machine_file, instruction);
                 lineCount++;
                 break;
             }
@@ -222,17 +251,15 @@ void basic_assembler(hashmap_t* instructions, hashmap_t* map, char* file_path, i
 
 int main(int argc, char *argv[])
 {
-    int len_path = strlen(argv[1]);
-    char* file_path = (char*)malloc(len_path * sizeof(char));
-    strcpy(file_path, argv[1]);
+    char* file_path = strdup(argv[1]);
 
-    hashmap_t* map;
+    //hashmap_t* map;
     //initializtion(map);
 
-    hashmap_t* instr;
-    initializeInstr(instr);
+    hashmap_t* instr = malloc(sizeof *instr);
+    initializeInstr(&instr);
 
-    basic_assembler(instr, map, file_path, len_path);
+    basic_assembler(instr, file_path);
     // second_pass();
 
     return 0;
