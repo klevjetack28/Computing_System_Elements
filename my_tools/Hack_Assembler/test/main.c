@@ -3,11 +3,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 // Assembler Headers
 #include "../include/hashmap.h"
 
-char* int_to_binary(int16_t num)
+char* int_to_binary(uint16_t num)
 {
     int bits = 16;
     char* binary = malloc(bits + 1);
@@ -15,8 +16,8 @@ char* int_to_binary(int16_t num)
     int n = num;
     for (int i = 0; i < bits; i++)
     {
-        n %= 2;
-        binary[bits - i - 1] = '0' + n;
+        uint16_t bit = n % 2;
+        binary[bits - i - 1] = '0' + bit;
         n /= 2;
     }
     binary[bits] = '\0';
@@ -40,27 +41,35 @@ char* instructionCoder(char* instruction, char prefix)
     size_t len = strlen(instruction);
     char* out = malloc(len + 2);
     out[0] = prefix;
-    memcpy(out + 1, instruction, len + 1);
+    int i;
+    for (i = 1; i < len + 1; i++)
+    {
+        if ((instruction[i - 1] == '\0') || (instruction[i - 1] == '\n'))
+        {
+            break;
+        }
+        out[i] = instruction[i - 1];
+    }
+    out[i] = '\0';
     return out;
 }
 
+
+
 int16_t cInstruction(hashmap_t* instructions, char* comp, char* dest, char* jump)
 {
-    int16_t instruction = 0;
-    instruction |= 0b111 << 3; // The first bit is a 1 and the next 2 bits are not used.
+    uint16_t instruction = 0;
+    instruction |= 0b111 << 13; // The first bit is a 1 and the next 2 bits are not used.
 
-    char* compI = instructionCoder(comp, 'c');
-    instruction |= search(instructions, compI) << 7; // 7 bits 1 bit is a next 6 specify the instruction.
+    size_t compBits = search(instructions, comp);
+    instruction |= compBits << 6; // 7 bits 1 bit is a next 6 specify the instruction.
+                                  //
+    size_t destBits = search(instructions, dest);
+    instruction |= destBits << 3; // 3 bits to specify the destination
 
-    char* destI = instructionCoder(dest, 'd');
-    instruction |= search(instructions, destI) << 3; // 3 bits to specify the destination
-
-    char* jumpI = instructionCoder(jump, 'j');
-    instruction |= search(instructions, jumpI) << 3; // 3 bits to specify the jump instruction
-
-    free(compI);
-    free(destI);
-    free(jumpI);
+    size_t jumpBits = search(instructions, jump);
+    instruction |= jumpBits; // 3 bits to specify the jump instruction
+    
     return instruction;
 }
 
@@ -166,7 +175,12 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
     {
         char* line = str;
         char startLine = line[0];
-
+                
+        char* comp = NULL; 
+        char* dest = NULL;
+        char* jump = NULL; // Parsed Symbols
+        char* token = calloc(5, sizeof(char)); // Temp symbol
+        
         switch (startLine)
         {
             case '@': { 
@@ -186,7 +200,6 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
                     num[i++] = startLine;
                 }
                 num[i] = '\0';
-                printf("%s\n", num); 
                 int16_t instruction = aInstruction(num);
                 writeInstruction(machine_file, instruction);
 
@@ -197,21 +210,16 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
             case 'D':
             case 'M': {
                 bool jmpInstr = false;
-                char comp[5], dest[5], jump[5]; // Parsed Symbols
 
-                char token[5]; // Temp symbol
                 int i = 0;
                 while((startLine = *line++) != '\0')
                 {
-                    // Append next char to token
-                    token[i++] = startLine;
-
+                    
                     // A dest instruction
                     if (startLine == '=')
                     {
                         jmpInstr = false;
-                        strcpy(dest, token);
-                        dest[4] = '\0';
+                        dest = instructionCoder(token, 'd');
                         i = 0;
                     }
 
@@ -219,30 +227,40 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
                     else if (startLine == ';')
                     {
                         jmpInstr = true;
-                        strcpy(comp, token);
-                        comp[4] = '\0';
+                        comp = instructionCoder(token, 'c');
                         i = 0;
+                    } 
+
+                    else
+                    {
+                        // Append next char to token
+                        token[i++] = startLine;
                     }
                 }
                 // If jump instruction rvalue = jump
                 if (jmpInstr)
                 {
-                    strcpy(jump, token);
-                    jump[4] = '\0';
+                    jump = instructionCoder(token, 'j');
+                    dest = instructionCoder("null", 'd');
                 }
                 // Else rvalue = comp
                 else 
                 {
-                    strcpy(comp, token);
-                    comp[4] = '\0';
+                    comp = instructionCoder(token, 'c');
+                    jump = instructionCoder("null", 'j');
                 }
 
                 int16_t instruction = cInstruction(instructions, comp, dest, jump);
                 writeInstruction(machine_file, instruction);
                 lineCount++;
+
                 break;
             }
         }
+        free(comp);
+        free(dest);
+        free(jump);
+        free(token);
     }
     free(str);
     free(machine_path);

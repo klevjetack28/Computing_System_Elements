@@ -100,7 +100,7 @@ int search(hashmap_t* map, char* key)
     node_t* currNode = map->arr[hash];
 
     while (currNode != NULL)
-    {
+    {    
         if (strcmp(currNode->key, key) == 0)
         {
             return currNode->value;
