@@ -146,8 +146,7 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
     machine_path[strlen(file_path) - 3] = '\0';
     
     // Concat the machine code path with the "hack" file extension
-    char* hackf_ext = malloc(5);
-    hackf_ext = "hack";
+    char* hackf_ext = "hack";
     strcat(machine_path, hackf_ext);
     printf("Machine path: %s\n", machine_path);
 
@@ -160,12 +159,12 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
 
     int lineCount = 0;
     
-    char* line;
+    char* str = NULL;
     size_t len = 0;
-    ssize_t read;
 
-    while ((read = getline(&line, &len, file)) != -1)
+    while (getline(&str, &len, file) != -1)
     {
+        char* line = str;
         char startLine = line[0];
 
         switch (startLine)
@@ -179,18 +178,19 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
                 strcpy(symbol, size + 1, line);
                 insert(map, symbol, lineHack + 1);
                 */
+                line++;
                 char num[len];
                 int i = 0;
-                while ((startLine = *++line) != '\0')
+                while ((startLine = *line++) != '\n')
                 {
                     num[i++] = startLine;
                 }
-                num[len - 1] = '\0';
-                
+                num[i] = '\0';
+                printf("%s\n", num); 
                 int16_t instruction = aInstruction(num);
                 writeInstruction(machine_file, instruction);
 
-                lineCount++;        
+                lineCount++;
                 break;
             }
             case 'A':
@@ -244,14 +244,17 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
             }
         }
     }
-        fclose(file);
-        fclose(machine_file);
+    free(str);
+    free(machine_path);
+    fclose(file);
+    fclose(machine_file);
+    return;
 }
 
 
 int main(int argc, char *argv[])
 {
-    char* file_path = strdup(argv[1]);
+    char* file_path = argv[1];
 
     //hashmap_t* map;
     //initializtion(map);
@@ -261,6 +264,6 @@ int main(int argc, char *argv[])
 
     basic_assembler(instr, file_path);
     // second_pass();
-
+    freeHashMap(instr);
     return 0;
 }

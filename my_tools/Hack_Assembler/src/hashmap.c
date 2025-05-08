@@ -7,10 +7,8 @@
 
 void setNode(node_t* node, char* key, int value)
 {
-    int len = strlen(key);
-    node->key = malloc(len + 1);
+    node->key = malloc(strlen(key) + 1);
     strcpy(node->key, key);
-    printf("%s\n", node->key);
     node->value = value;
     node->next = NULL;
 }
@@ -50,7 +48,7 @@ void insert(hashmap_t** mapPtr, char* key, int value)
     } 
     else
     {
-        (*mapPtr)->arr[hash]->next = (*mapPtr)->arr[hash];
+        newNode->next = (*mapPtr)->arr[hash];
         (*mapPtr)->arr[hash] = newNode;
     }
 
