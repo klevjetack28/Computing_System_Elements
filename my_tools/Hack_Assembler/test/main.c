@@ -73,9 +73,9 @@ int16_t cInstruction(hashmap_t* instructions, char* comp, char* dest, char* jump
     return instruction;
 }
 
-/*
-void initialization(hashmap_t* map)
+void initialization(hashmap_t** map)
 {
+    initializeHashMap(*map, 0, 8);
     int registers = 16;
     for (int i = 0; i < registers; i++)
     {
@@ -86,10 +86,7 @@ void initialization(hashmap_t* map)
     
     insert(map, "SCREEN", 16384);
     insert(map, "KBD", 24576);
-
-    return;
 }
-*/
 
 void initializeInstr(hashmap_t** instructions)
 {
@@ -274,14 +271,15 @@ int main(int argc, char *argv[])
 {
     char* file_path = argv[1];
 
-    //hashmap_t* map;
-    //initializtion(map);
+    hashmap_t* symbolTable = malloc(sizeof *symbolTable);
+    initializtion(&map);
 
     hashmap_t* instr = malloc(sizeof *instr);
     initializeInstr(&instr);
 
-    basic_assembler(instr, file_path);
+    basic_assembler(symbolTable, instr, file_path);
     // second_pass();
+    freeHashMap(symbolTable);
     freeHashMap(instr);
     return 0;
 }
