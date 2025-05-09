@@ -26,11 +26,9 @@ bool isSymbol(char* str)
 
     if ((str[0] >= '0' && str[0] <= '9'))
     {
-        printf("%s, not symbol\n", str);
         return !symbol;
     }
 
-    printf("%s, symbol\n", str);
     return symbol;
 }
 
@@ -163,7 +161,62 @@ void initializeInstr(hashmap_t** instructions)
     insert(instructions, "jJMP", 0b111);
 }
 
-void basic_assembler(hashmap_t* symbolTable, hashmap_t* instructions, char* file_path)
+void first_pass(hashmap_t** symbolTable, char* file_path)
+{
+    FILE* file = fopen(file_path, "r");
+    if (file == NULL)
+    {
+        printf("ERROR: Count not open file {%s}.\n", file_path);
+        return;
+    }
+    
+    int lineCount = -1;
+    char* str = NULL;
+    size_t len;
+    
+    while(getline(&str, &len, file) != -1)
+    {
+        char* line = str;
+        remove_preceding_spaces(line);
+        char startLine = line[0];
+
+        switch (startLine)
+        {
+            case '(': {
+                line++;
+                char* symbol = malloc(len);
+                int size = 0;
+                while ((startLine = *line++) != ')')
+                {
+                    symbol[size++] = startLine;
+                }
+                symbol[size] = '\0';
+
+                int val = search(*symbolTable, symbol);
+                if (val == -1)
+                {
+                    insert(symbolTable, symbol, lineCount + 1);
+                }
+               
+                free(symbol);
+                break;
+            }
+            case '@':
+            case 'A':
+            case 'D':
+            case 'M':
+            case '0':
+            case '1': {
+                lineCount++;
+                break;
+            }
+        }
+    }
+    free(str);
+    fclose(file);
+}
+
+void second_pass(hashmap_t** symbolTable, hashmap_t* instructions, char* file_path)
 {
     FILE* file = fopen(file_path, "r");
     if (file == NULL) 
@@ -189,7 +242,7 @@ void basic_assembler(hashmap_t* symbolTable, hashmap_t* instructions, char* file
         return;
     }
 
-    int lineCount = 0;
+    int lineCount = -1;
     
     char* str = NULL;
     size_t len = 0;
@@ -204,19 +257,11 @@ void basic_assembler(hashmap_t* symbolTable, hashmap_t* instructions, char* file
         char* comp = NULL; 
         char* dest = NULL;
         char* jump = NULL;
-        char* symbol = NULL;
-        char* token = calloc(16, sizeof(char)); // Temp symbol
+        char* token = calloc(32, sizeof(char)); // Temp symbol
         
         switch (startLine)
         {
             case '(': {
-                int size = 0;
-                while ((startLine = *line++) != ')')
-                {
-                    //printf("%c\n", startLine);
-                    token[size++] = startLine;
-                }
-                //insert(&symbolTable, symbol, lineCount + 1);
                 break;
             }
             case '@': { 
@@ -230,17 +275,12 @@ void basic_assembler(hashmap_t* symbolTable, hashmap_t* instructions, char* file
                 variable[i] = '\0';
                 if (isSymbol(variable))
                 {
-                    // If it is not a variable create one else replace 
-                    if (search(symbolTable, variable) == -1)
+                    int val = search(*symbolTable, variable);
+                    if (val == -1)
                     {
-                        sprintf(variable, "%d", symbolTable->numNodes - 2);
-                        insert(&symbolTable, variable, symbolTable->numNodes - 2);
+                        insert(symbolTable, variable, (*symbolTable)->capacity - 2);
                     }
-                    else
-                    {
-                        int aVal = search(symbolTable, variable);
-                        sprintf(variable, "%d", aVal);
-                    }
+                    sprintf(variable, "%d", val);
                 }
                 int16_t instruction = aInstruction(variable);
                 writeInstruction(machine_file, instruction);
@@ -303,7 +343,6 @@ void basic_assembler(hashmap_t* symbolTable, hashmap_t* instructions, char* file
         free(comp);
         free(dest);
         free(jump);
-        free(symbol);
         free(token);
     }
     free(str);
@@ -322,10 +361,15 @@ int main(int argc, char *argv[])
     initialization(&symbolTable);
 
     hashmap_t* instr = malloc(sizeof *instr);
+    // Initialize generic symbols
     initializeInstr(&instr);
 
-    basic_assembler(symbolTable, instr, file_path);
-    // second_pass();
+    // Initialize program symbols
+    first_pass(&symbolTable, file_path);
+    
+    // Translate parsed assembly into machine code.
+    second_pass(&symbolTable, instr, file_path);
+    
     freeHashMap(symbolTable);
     freeHashMap(instr);
     return 0;
