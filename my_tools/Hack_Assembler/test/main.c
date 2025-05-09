@@ -4,9 +4,35 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <ctype.h>
 
 // Assembler Headers
 #include "../include/hashmap.h"
+
+void remove_preceding_spaces(char* str) {
+    int i = 0, j = 0;
+    while (isspace(str[i])) {
+        i++;
+    }
+    while (str[i] != '\0') {
+        str[j++] = str[i++];
+    }
+    str[j] = '\0';
+}
+
+bool isSymbol(char* str)
+{
+    bool symbol = true;
+
+    if ((str[0] >= '0' && str[0] <= '9'))
+    {
+        printf("%s, not symbol\n", str);
+        return !symbol;
+    }
+
+    printf("%s, symbol\n", str);
+    return symbol;
+}
 
 char* int_to_binary(uint16_t num)
 {
@@ -137,7 +163,7 @@ void initializeInstr(hashmap_t** instructions)
     insert(instructions, "jJMP", 0b111);
 }
 
-void basic_assembler(hashmap_t* instructions, char* file_path)
+void basic_assembler(hashmap_t* symbolTable, hashmap_t* instructions, char* file_path)
 {
     FILE* file = fopen(file_path, "r");
     if (file == NULL) 
@@ -171,38 +197,60 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
     while (getline(&str, &len, file) != -1)
     {
         char* line = str;
+        remove_preceding_spaces(line);
         char startLine = line[0];
-                
+
+        // Parsed Symbols
         char* comp = NULL; 
         char* dest = NULL;
-        char* jump = NULL; // Parsed Symbols
-        char* token = calloc(5, sizeof(char)); // Temp symbol
+        char* jump = NULL;
+        char* symbol = NULL;
+        char* token = calloc(16, sizeof(char)); // Temp symbol
         
         switch (startLine)
         {
-            case '@': { 
-                /* Old parenthesis code will reuse
+            case '(': {
+                int size = 0;
+                while ((startLine = *line++) != ')')
                 {
-                    size++;
+                    //printf("%c\n", startLine);
+                    token[size++] = startLine;
                 }
-                char* symbol;
-                strcpy(symbol, size + 1, line);
-                insert(map, symbol, lineHack + 1);
-                */
+                //insert(&symbolTable, symbol, lineCount + 1);
+                break;
+            }
+            case '@': { 
                 line++;
-                char num[len];
+                char* variable = malloc(len);
                 int i = 0;
                 while ((startLine = *line++) != '\n')
                 {
-                    num[i++] = startLine;
+                    variable[i++] = startLine;
                 }
-                num[i] = '\0';
-                int16_t instruction = aInstruction(num);
+                variable[i] = '\0';
+                if (isSymbol(variable))
+                {
+                    // If it is not a variable create one else replace 
+                    if (search(symbolTable, variable) == -1)
+                    {
+                        sprintf(variable, "%d", symbolTable->numNodes - 2);
+                        insert(&symbolTable, variable, symbolTable->numNodes - 2);
+                    }
+                    else
+                    {
+                        int aVal = search(symbolTable, variable);
+                        sprintf(variable, "%d", aVal);
+                    }
+                }
+                int16_t instruction = aInstruction(variable);
                 writeInstruction(machine_file, instruction);
 
+                free(variable);
                 lineCount++;
                 break;
             }
+            case '0':
+            case '1':
             case 'A':
             case 'D':
             case 'M': {
@@ -211,11 +259,10 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
                 int i = 0;
                 while((startLine = *line++) != '\0')
                 {
-                    
                     // A dest instruction
                     if (startLine == '=')
                     {
-                        jmpInstr = false;
+                        jmpInstr |= false;
                         dest = instructionCoder(token, 'd');
                         i = 0;
                     }
@@ -223,7 +270,7 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
                     // A jump instruction
                     else if (startLine == ';')
                     {
-                        jmpInstr = true;
+                        jmpInstr |= true;
                         comp = instructionCoder(token, 'c');
                         i = 0;
                     } 
@@ -250,13 +297,13 @@ void basic_assembler(hashmap_t* instructions, char* file_path)
                 int16_t instruction = cInstruction(instructions, comp, dest, jump);
                 writeInstruction(machine_file, instruction);
                 lineCount++;
-
                 break;
             }
         }
         free(comp);
         free(dest);
         free(jump);
+        free(symbol);
         free(token);
     }
     free(str);
@@ -272,7 +319,7 @@ int main(int argc, char *argv[])
     char* file_path = argv[1];
 
     hashmap_t* symbolTable = malloc(sizeof *symbolTable);
-    initializtion(&map);
+    initialization(&symbolTable);
 
     hashmap_t* instr = malloc(sizeof *instr);
     initializeInstr(&instr);
