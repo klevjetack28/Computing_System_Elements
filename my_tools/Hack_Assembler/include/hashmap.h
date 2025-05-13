@@ -19,7 +19,7 @@ void setNode(node_t* node, char* key, int value);
 
 void initializeHashMap(hashmap_t* map, int numNodes, int capacity);
 
-int hashFunction(int capacity, unsigned char* key);
+int hashFunction(int capacity, char* key);
 
 void insert(hashmap_t** map, char* key, int value);
 

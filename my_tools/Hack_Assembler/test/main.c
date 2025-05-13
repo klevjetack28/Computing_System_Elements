@@ -87,13 +87,12 @@ int16_t cInstruction(hashmap_t* instructions, char* comp, char* dest, char* jump
 
     size_t compBits = search(instructions, comp);
     instruction |= compBits << 6; // 7 bits 1 bit is a next 6 specify the instruction.
-                                  //
+    
     size_t destBits = search(instructions, dest);
     instruction |= destBits << 3; // 3 bits to specify the destination
 
     size_t jumpBits = search(instructions, jump);
     instruction |= jumpBits; // 3 bits to specify the jump instruction
-    
     return instruction;
 }
 
@@ -107,7 +106,8 @@ void initialization(hashmap_t** map)
         sprintf(registerName, "R%d", i);
         insert(map, registerName, i);
     }
-    
+   
+    insert(map, "SP", 256);
     insert(map, "SCREEN", 16384);
     insert(map, "KBD", 24576);
 }
@@ -195,6 +195,7 @@ void first_pass(hashmap_t** symbolTable, char* file_path)
                 int val = search(*symbolTable, symbol);
                 if (val == -1)
                 {
+                    // TODO - Create Labels table symbolTable is your RAM labels are just constants.
                     insert(symbolTable, symbol, lineCount + 1);
                 }
                
@@ -261,9 +262,6 @@ void second_pass(hashmap_t** symbolTable, hashmap_t* instructions, char* file_pa
         
         switch (startLine)
         {
-            case '(': {
-                break;
-            }
             case '@': { 
                 line++;
                 char* variable = malloc(len);
@@ -278,7 +276,8 @@ void second_pass(hashmap_t** symbolTable, hashmap_t* instructions, char* file_pa
                     int val = search(*symbolTable, variable);
                     if (val == -1)
                     {
-                        insert(symbolTable, variable, (*symbolTable)->capacity - 2);
+                        printf("%s, %d\n", variable, (*symbolTable)->numNodes - 3);
+                        insert(symbolTable, variable, (*symbolTable)->numNodes - 3);
                     }
                     sprintf(variable, "%d", val);
                 }
@@ -315,7 +314,7 @@ void second_pass(hashmap_t** symbolTable, hashmap_t* instructions, char* file_pa
                         i = 0;
                     } 
 
-                    else
+                    else if (startLine != '\n')
                     {
                         // Append next char to token
                         token[i++] = startLine;

@@ -20,11 +20,11 @@ void initializeHashMap(hashmap_t* map, int numNodes, int capacity)
     map->arr = calloc(capacity, sizeof(*map->arr));
 }
 
-int hashFunction(int capacity, unsigned char* key)
+int hashFunction(int capacity, char* key)
 {
     unsigned long hash = 5381;
     int c;
-    
+
     while (c = *key++)
     {
         // Uses n = 33 because for unknown reason works well with string hashes.
